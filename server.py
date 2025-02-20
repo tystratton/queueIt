@@ -13,7 +13,7 @@ SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIPY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 
 # Define the scope (What permissions are requested)
-SCOPE = "user-read-currently-playing user-read-playback-state user-modify-playback-state"
+SCOPE = "user-read-currently-playing user-read-playback-state"
 
 # Create the Spotify OAuth manager
 sp_oauth = SpotifyOAuth(
@@ -75,34 +75,6 @@ def auth():
     session["token_info"] = token_info
     return redirect('/current-track')  # Redirect to current-track after successful auth
 
-@app.route('/add-to-queue')
-def add_to_queue():
-    """Add a track to the Spotify queue"""
-    track_name = request.args.get('track')
-    artist_name = request.args.get('artist')
-    
-    token_info = session.get("token_info", None)
-    if not token_info:
-        return jsonify({"error": "Not authenticated"}), 401
-
-    sp = spotipy.Spotify(auth=token_info["access_token"])
-    
-    # Search for the track
-    query = f"track:{track_name} artist:{artist_name}"
-    results = sp.search(q=query, type='track', limit=1)
-    
-    if results['tracks']['items']:
-        track_uri = results['tracks']['items'][0]['uri']
-        sp.add_to_queue(uri=track_uri)
-        return jsonify({
-            "success": True,
-            "message": f"Added {track_name} by {artist_name} to the queue!"
-        })
-    else:
-        return jsonify({
-            "success": False,
-            "message": f"Couldn't find {track_name} by {artist_name}"
-        })
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
