@@ -5,33 +5,44 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Now Playing Widget</title>
     <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background: transparent;
+        }
+
         .widget-container {
             display: inline-block;
-            background-color: black;
-            color: white;
-            height: 40px;
-            width: 150px;
+            /* Changed from rgba to solid black */
+            background-color: #000000;
+            color: #95FA7F;
+            /* Increased height */
+            height: 50px;
+            /* Increased width */
+            width: 300px;
             overflow: hidden;
-            border-radius: 5px;
+            border-radius: 8px;
         }
 
         .marquee-container {
             display: flex;
             width: fit-content;
-            animation: scroll 10s linear infinite;
+            animation: scroll 8s linear infinite;
         }
 
         .track-info {
             font-family: Arial, sans-serif;
-            font-size: 14px;
-            padding: 0 20px;
-            line-height: 40px;
+            /* Increased font size */
+            font-size: 18px;
+            padding: 0 10px;
+            /* Adjusted line height to match new height */
+            line-height: 50px;
             white-space: nowrap;
         }
 
         @keyframes scroll {
             0% { transform: translateX(0); }
-            100% { transform: translateX(-33.33%); }
+            100% { transform: translateX(-50%); }
         }
     </style>
 </head>
@@ -47,7 +58,7 @@
     <script>
         async function fetchTrack() {
             try {
-                const response = await fetch("http://localhost:5000/current-track");
+                const response = await fetch("/current-track");
                 const data = await response.json();
                 
                 if (data.track && data.artists) {
@@ -62,6 +73,7 @@
                     document.getElementById("trackDisplay3").textContent = text;
                 }
             } catch (error) {
+                console.error('Fetch error:', error);
                 const text = "Error fetching track";
                 document.getElementById("trackDisplay").textContent = text;
                 document.getElementById("trackDisplay2").textContent = text;
@@ -69,8 +81,14 @@
             }
         }
 
-        setInterval(fetchTrack, 15000);
+        // Regular updates
+        setInterval(fetchTrack, 5000);
         fetchTrack();
+
+        // Force page refresh every 5 minutes
+        setInterval(() => {
+            window.location.reload();
+        }, 300000);
     </script>
 </body>
 </html>

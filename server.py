@@ -1,10 +1,13 @@
 import os
+from dotenv import load_dotenv
 import spotipy
 from spotipy.oauth2 import SpotifyOAuth
 from flask import Flask, request, redirect, session, jsonify, render_template
+from flask_cors import CORS
 
-
+load_dotenv()
 app = Flask(__name__)
+CORS(app)
 app.secret_key = os.getenv("SECRET_KEY")
 
 # Your Spotify App Credentials (Stored Securely on the Backend)
@@ -22,7 +25,6 @@ sp_oauth = SpotifyOAuth(
     redirect_uri=SPOTIPY_REDIRECT_URI,
     scope=SCOPE
 )
-
 
 @app.route('/')
 def login():
@@ -46,20 +48,49 @@ def callback():
 def get_current_track():
     """ Fetch the current track and return JSON response """
     token_info = session.get("token_info", None)
+    
+    # Add debug logging
+    print("Token info:", "Present" if token_info else "None")
 
     if not token_info:
-        return jsonify({"error": "Not authenticated"}), 401
+        try:
+            # Try to get a new token if possible
+            token_info = sp_oauth.get_cached_token()
+            if token_info:
+                session["token_info"] = token_info
+            else:
+                print("No cached token found")
+                return jsonify({"message": "No track currently playing - Auth needed"})
+        except Exception as e:
+            print("Auth error:", str(e))
+            return jsonify({"message": "No track currently playing - Auth error"})
 
-    sp = spotipy.Spotify(auth=token_info["access_token"])
-    current_playback = sp.current_playback()
+    # Check if token needs to be refreshed
+    if sp_oauth.is_token_expired(token_info):
+        try:
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            session["token_info"] = token_info
+        except Exception as e:
+            print("Token refresh error:", str(e))
+            return jsonify({"message": "No track currently playing - Token refresh error"})
 
-    if current_playback and current_playback['is_playing']:
-        track = current_playback['item']
-        track_name = track['name']
-        artists = ", ".join([artist['name'] for artist in track['artists']])
-        return jsonify({"track": track_name, "artists": artists})
-    
-    return jsonify({"message": "No track currently playing"})
+    try:
+        sp = spotipy.Spotify(auth=token_info["access_token"])
+        current_playback = sp.current_playback()
+        
+        # Add debug logging
+        print("Playback state:", "Playing" if current_playback and current_playback['is_playing'] else "Not playing")
+
+        if current_playback and current_playback['is_playing']:
+            track = current_playback['item']
+            track_name = track['name']
+            artists = ", ".join([artist['name'] for artist in track['artists']])
+            return jsonify({"track": track_name, "artists": artists})
+        
+        return jsonify({"message": "No track currently playing - No playback"})
+    except Exception as e:
+        print("Spotify API error:", str(e))
+        return jsonify({"message": "No track currently playing - API error"})
 
 @app.route('/current-track-widget')
 def current_track_widget():
