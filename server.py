@@ -16,7 +16,7 @@ SPOTIPY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 SPOTIPY_REDIRECT_URI = os.getenv("SPOTIFY_REDIRECT_URI")
 
 # Define the scope (What permissions are requested)
-SCOPE = "user-read-currently-playing user-read-playback-state"
+SCOPE = "user-read-currently-playing user-read-playback-state user-modify-playback-state"
 
 # Create the Spotify OAuth manager
 sp_oauth = SpotifyOAuth(
@@ -27,22 +27,21 @@ sp_oauth = SpotifyOAuth(
 )
 
 @app.route('/')
-def login():
+def index():
     """ Redirect users to Spotify authentication """
     auth_url = sp_oauth.get_authorize_url()
     return redirect(auth_url)
 
-
-@app.route('/callback')
-def callback():
-    """ Handle Spotify OAuth Callback """
+@app.route('/auth')
+def auth():
+    """Handle Spotify OAuth Callback"""
     session.clear()
     code = request.args.get('code')
     token_info = sp_oauth.get_access_token(code)
-
+    
+    # Cache the token (this will write to .cache file)
     session["token_info"] = token_info
     return redirect('/current-track')
-
 
 @app.route('/current-track')
 def get_current_track():
@@ -96,16 +95,55 @@ def get_current_track():
 def current_track_widget():
     return render_template('index.html')
 
-@app.route('/auth')
-def auth():
-    """Handle Spotify OAuth Callback"""
-    session.clear()
-    code = request.args.get('code')
-    token_info = sp_oauth.get_access_token(code)
+@app.route('/queue-song', methods=['POST'])
+def queue_song():
+    """Add a song to the Spotify queue"""
+    token_info = sp_oauth.get_cached_token()
     
-    session["token_info"] = token_info
-    return redirect('/current-track')  # Redirect to current-track after successful auth
+    if not token_info:
+        return jsonify({"message": "Not authenticated with Spotify"}), 401
 
+    # Check if token needs refresh
+    if sp_oauth.is_token_expired(token_info):
+        try:
+            token_info = sp_oauth.refresh_access_token(token_info['refresh_token'])
+            # Cache is updated automatically by spotipy
+        except Exception as e:
+            print("Token refresh error:", str(e))
+            return jsonify({"message": "Authentication error"}), 401
+
+    # Get the song name from the request
+    data = request.get_json()
+    song_name = data.get('song_name')
+    
+    if not song_name:
+        return jsonify({"message": "No song name provided"}), 400
+
+    try:
+        sp = spotipy.Spotify(auth=token_info['access_token'])
+        
+        # Search for the song
+        results = sp.search(q=song_name, type='track', limit=1)
+        
+        if not results['tracks']['items']:
+            return jsonify({"message": "Song not found"}), 404
+            
+        track_uri = results['tracks']['items'][0]['uri']
+        
+        # Add the song to the queue
+        sp.add_to_queue(uri=track_uri)
+        
+        track_name = results['tracks']['items'][0]['name']
+        artist_name = results['tracks']['items'][0]['artists'][0]['name']
+        
+        return jsonify({
+            "message": "Song queued successfully",
+            "track": f"{track_name} by {artist_name}"
+        })
+        
+    except Exception as e:
+        print(f"Error queueing song: {e}")
+        return jsonify({"message": "Failed to queue song"}), 500
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)

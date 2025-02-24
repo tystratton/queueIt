@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 # Define the scope. Here we're requesting permission to read the currently playing track.
-scope = "user-read-currently-playing"
+scope = "user-read-currently-playing user-read-playback-state user-modify-playback-state"
 
 # Create the Spotify client with OAuth credentials
 sp = spotipy.Spotify(auth_manager=SpotifyOAuth(
