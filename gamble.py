@@ -31,31 +31,9 @@ class LeagueBetting:
         # self.current_game = None
         # self.last_checked_match = None
         self.active_bets = {}
-        self.points_file = 'channel_points.json'
         self.load_points()
         self.betting_open = False
         self.last_game_id = None
-
-    def load_points(self):
-        """Load channel points from file"""
-        try:
-            with open(self.points_file, 'r') as f:
-                self.channel_points = json.load(f)
-        except FileNotFoundError:
-            self.channel_points = {}
-            self.save_points()
-
-    def save_points(self):
-        """Save channel points to file"""
-        with open(self.points_file, 'w') as f:
-            json.dump(self.channel_points, f)
-
-    def get_points(self, user_id):
-        """Get user's points, create entry if doesn't exist"""
-        if user_id not in self.channel_points:
-            self.channel_points[user_id] = 1000  # Starting points
-            self.save_points()
-        return self.channel_points[user_id]
 
     # async def check_current_game(self):
     #     """Check if player is in an active game"""
@@ -97,43 +75,6 @@ class LeagueBetting:
     #         print(f"Error checking current game: {e}")
     #         return False
 
-    def place_bet(self, user_id, amount, prediction):
-        """Place a bet on the current game"""
-        if not self.current_game:
-            return "No active game to bet on!"
-        
-        if user_id not in self.channel_points:
-            self.channel_points[user_id] = 1000  # Starting points
-            
-        if amount > self.channel_points[user_id]:
-            return f"Not enough points! You have {self.channel_points[user_id]} points."
-            
-        self.active_bets[user_id] = {
-            "amount": amount,
-            "prediction": prediction,
-            "timestamp": datetime.now().timestamp()
-        }
-        
-        self.channel_points[user_id] -= amount
-        self.save_points()
-        
-        return f"Bet placed: {amount} points on {prediction}"
-
-    def process_game_result(self, won: bool):
-        """Process all bets after game ends"""
-        payouts = []
-        for user_id, bet in self.active_bets.items():
-            bet_won = (bet["prediction"].lower() == 'win') == won
-            if bet_won:
-                payout = bet["amount"] * 2
-                self.channel_points[user_id] += payout
-                payouts.append(f"{user_id} won {payout} points!")
-            else:
-                payouts.append(f"{user_id} lost {bet['amount']} points!")
-
-        self.save_points()
-        self.active_bets = {}  # Clear bets
-        return payouts
 
     # async def monitor_game_state(self):
     #     """Monitor for new games and results"""
